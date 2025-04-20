@@ -5,6 +5,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusMessage = document.getElementById('statusMessage');
   const downloadedPagesElement = document.getElementById('downloadedPages');
   const waitingPagesElement = document.getElementById('waitingPages');
+  const detectPagesBtn = document.getElementById('detectPages');
+  
+  // Add references to the new progress bars
+  const downloadedBarElement = document.getElementById('downloadedBar');
+  const waitingBarElement = document.getElementById('waitingBar');
+  
+  // Track total pages for progress calculations
+  let totalPagesCount = 0;
   
   // Track the first download ID and folder name to enable opening the folder later
   let firstDownloadId = null;
@@ -41,6 +49,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     const totalPages = parseInt(totalPagesInput.value);
+    totalPagesCount = totalPages; // Store for progress calculations
     
     if (isNaN(totalPages) || totalPages <= 0) {
       statusMessage.textContent = "❌ Số trang không hợp lệ.";
@@ -63,6 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
     firstDownloadId = null;
     currentFolderName = null;
     openFolderButton.style.display = "none";
+    
+    // Reset progress bars
+    downloadedBarElement.style.width = '0%';
+    waitingBarElement.style.width = '0%';
     
     logStatus("Querying active tab");
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -203,12 +216,29 @@ document.addEventListener('DOMContentLoaded', function() {
       case "downloadedPages":
         if (request.pages && request.pages.length > 0) {
           downloadedPagesElement.textContent = request.pages;
+          
+          // Update progress bar if we have total pages info
+          if (totalPagesCount > 0) {
+            const downloaded = parseInt(request.pages) || 0;
+            const percentComplete = Math.min(100, Math.round((downloaded / totalPagesCount) * 100));
+            downloadedBarElement.style.width = percentComplete + '%';
+          }
         }
         break;
         
       case "waitingPages":
         if (request.pages && request.pages.length > 0) {
           waitingPagesElement.textContent = request.pages;
+          
+          // Update waiting progress bar if we have total pages info
+          if (totalPagesCount > 0 && request.pages !== '-') {
+            const waiting = parseInt(request.pages) || 0;
+            const percentWaiting = Math.min(100, Math.round((waiting / totalPagesCount) * 100));
+            waitingBarElement.style.width = percentWaiting + '%';
+          } else {
+            // If we're in initial "Đang tải..." state
+            waitingBarElement.style.width = '100%';
+          }
         }
         break;
         
@@ -219,6 +249,10 @@ document.addEventListener('DOMContentLoaded', function() {
         startButton.textContent = "Bắt đầu Tải";
         waitingPagesElement.textContent = "-";
         isProcessing = false;
+        
+        // Complete the progress bars
+        downloadedBarElement.style.width = '100%';
+        waitingBarElement.style.width = '0%';
         
         // Show the Open Folder button if we have a download ID
         if (firstDownloadId !== null) {
@@ -233,4 +267,69 @@ document.addEventListener('DOMContentLoaded', function() {
     
     return true; // Keep the message channel open
   });
+
+  // Detect pages button click handler
+  detectPagesBtn.addEventListener('click', function() {
+    detectPagesBtn.textContent = 'Đang phát hiện...';
+    
+    // Execute script in the active Google Docs tab to detect page count
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      chrome.scripting.executeScript({
+        target: {tabId: tabs[0].id},
+        function: detectGoogleDocsPageCount
+      }, (results) => {
+        detectPagesBtn.textContent = 'Phát hiện';
+        
+        if (results && results[0] && results[0].result) {
+          totalPagesInput.value = results[0].result;
+          statusMessage.textContent = `Đã phát hiện ${results[0].result} trang từ Google Docs.`;
+          statusMessage.className = 'success';
+        } else {
+          statusMessage.textContent = 'Không thể phát hiện số trang. Hãy kiểm tra lại hoặc nhập thủ công.';
+          statusMessage.className = 'error';
+        }
+      });
+    });
+  });
+
+  // Function to detect Google Docs page count
+  function detectGoogleDocsPageCount() {
+    try {
+      // Look for the tooltip element that shows page numbers
+      const tooltips = document.querySelectorAll('div[class*="jfk-tooltip-content"]');
+      let pageCountText = '';
+      
+      // Search for a tooltip with page numbers "X of Y"
+      for (let tooltip of tooltips) {
+        if (tooltip.textContent && tooltip.textContent.match(/\d+\s+of\s+\d+/i)) {
+          pageCountText = tooltip.textContent;
+          break;
+        }
+      }
+      
+      // If not found in tooltips, try to find it in the status bar
+      if (!pageCountText) {
+        const statusElements = document.querySelectorAll('.docs-status-container *');
+        for (let element of statusElements) {
+          if (element.textContent && element.textContent.match(/\d+\s+of\s+\d+/i)) {
+            pageCountText = element.textContent;
+            break;
+          }
+        }
+      }
+      
+      if (pageCountText) {
+        // Extract the total page count (the number after "of")
+        const match = pageCountText.match(/of\s+(\d+)/i);
+        if (match && match[1]) {
+          return parseInt(match[1], 10);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error("Error detecting page count:", error);
+      return null;
+    }
+  }
 });
