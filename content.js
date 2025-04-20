@@ -1,50 +1,54 @@
 console.log("Google Canvas Download content script loaded");
 
+// Constants and state variables
 const processedZIndexes = new Set();
 let totalPages = 0;
 let isDownloading = false;
 let downloadFolderName = '';
 
-// Send a message to let the popup know the content script has loaded
-// Make sure this runs immediately when the script loads
-try {
-  chrome.runtime.sendMessage({
-      action: "contentScriptLoaded"
-  });
-} catch (e) {
-  console.error("Failed to send contentScriptLoaded message:", e);
+// Utility functions
+function sanitizeFileName(name) {
+    return name.replace(/[\\/:*?"<>|]/g, '_');
 }
 
-// Listen for messages from popup with explicit error handling
+function sendStatusMessage(action, data) {
+    try {
+        chrome.runtime.sendMessage({
+            action: action,
+            ...data
+        });
+    } catch (e) {
+        console.error(`Failed to send ${action} message:`, e);
+    }
+}
+
+// Initialization - notify popup that content script is loaded
+try {
+    chrome.runtime.sendMessage({
+        action: "contentScriptLoaded"
+    });
+} catch (e) {
+    console.error("Failed to send contentScriptLoaded message:", e);
+}
+
+// Message handler
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     console.log(`Content script received message: ${request.action}`, request);
     
     try {
-        // Simple ping to check if content script is loaded
-        if (request.action === "ping") {
-            console.log("Ping received, responding with active status");
-            sendResponse({status: "content_script_active"});
-            return true;
-        }
-        
-        if (request.action === "startDownload") {
-            totalPages = request.totalPages;
-            console.log(`Start download request for ${totalPages} pages, current status: ${isDownloading ? 'downloading' : 'idle'}`);
-            
-            if (!isDownloading) {
-                isDownloading = true;
+        switch (request.action) {
+            case "ping":
+                console.log("Ping received, responding with active status");
+                sendResponse({status: "content_script_active"});
+                break;
                 
-                // Critical: Respond immediately before starting the process
-                console.log("Sending 'started' response");
-                sendResponse({status: "started"});
+            case "startDownload":
+                handleStartDownload(request, sendResponse);
+                break;
                 
-                // Start the download process asynchronously after sending response
-                setTimeout(startDownloadProcess, 10);
-            } else {
-                console.log("Already downloading, sending 'already_downloading' response");
-                sendResponse({status: "already_downloading"});
-            }
-            return true;
+            default:
+                console.log(`Unhandled action: ${request.action}`);
+                sendResponse({status: "unknown_action"});
         }
     } catch (e) {
         console.error("Error handling message:", e);
@@ -58,142 +62,160 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // Keep the message channel open for async response
 });
 
-// Start the download process without requiring directory selection
+// Handle download start request
+function handleStartDownload(request, sendResponse) {
+    totalPages = request.totalPages;
+    console.log(`Start download request for ${totalPages} pages, current status: ${isDownloading ? 'downloading' : 'idle'}`);
+    
+    if (!isDownloading) {
+        isDownloading = true;
+        
+        // Critical: Respond immediately before starting the process
+        console.log("Sending 'started' response");
+        sendResponse({status: "started"});
+        
+        // Start the download process asynchronously after sending response
+        setTimeout(startDownloadProcess, 10);
+    } else {
+        console.log("Already downloading, sending 'already_downloading' response");
+        sendResponse({status: "already_downloading"});
+    }
+}
+
+// Main download functions
 function startDownloadProcess() {
     console.log("Starting download process");
     
-    chrome.runtime.sendMessage({
-        action: "downloadStatus",
+    sendStatusMessage("downloadStatus", {
         message: "🔄 Đang chuẩn bị tải xuống..."
     });
 
     // Get the document title for folder name
-    downloadFolderName = document.title.replace(/[\\/:*?"<>|]/g, '_');
+    downloadFolderName = sanitizeFileName(document.title);
     
-    chrome.runtime.sendMessage({
-        action: "downloadStatus",
+    sendStatusMessage("downloadStatus", {
         message: `🔄 Tải xuống vào thư mục: "${downloadFolderName}"`
     });
 
-    function extractCanvasData() {
-        const canvases = document.querySelectorAll('canvas.kix-canvas-tile-content');
-        if (canvases.length === 0) {
-            chrome.runtime.sendMessage({
-                action: "downloadStatus", 
-                message: "Không tìm thấy canvas nào."
-            });
-            isDownloading = false;
-            return false;
-        }
+    startExtraction();
+}
 
-        const pageTitle = document.title.replace(/[\\/:*?"<>|]/g, '_');
-        const skippedZIndexes = [];
-        
-        // Process canvases
-        Array.from(canvases).forEach((canvas) => {
-            try {
-                const rawZ = parseInt(getComputedStyle(canvas).zIndex || "-1");
-                const displayZ = rawZ + 1;
-
-                if (isNaN(rawZ) || processedZIndexes.has(rawZ)) {
-                    skippedZIndexes.push(displayZ);
-                    return;
-                }
-
-                // Use a self-executing async function to handle each canvas
-                (async () => {
-                    try {
-                        const dataURL = canvas.toDataURL("image/png");
-                        // Changed naming format: page number first, then document title
-                        const fileName = `${displayZ}_${pageTitle}.png`;
-                        
-                        console.log(`Processing page ${displayZ}, sending download request`);
-                        
-                        // Use Chrome's downloads API to save the file
-                        chrome.runtime.sendMessage({
-                            action: "downloadFile",
-                            dataUrl: dataURL,
-                            fileName: fileName,
-                            folderName: downloadFolderName
-                        }, response => {
-                            console.log(`Received response for page ${displayZ}:`, response);
-                            
-                            if (response && response.success) {
-                                processedZIndexes.add(rawZ);
-                                
-                                // Send updated list of all downloaded pages
-                                const allDownloadedPages = Array.from(processedZIndexes)
-                                    .map(x => x + 1)
-                                    .sort((a, b) => a - b);
-                                
-                                chrome.runtime.sendMessage({
-                                    action: "downloadedPages", 
-                                    pages: allDownloadedPages.join(', ')
-                                });
-                                
-                                // Check if we're done
-                                checkCompletion();
-                            } else {
-                                console.error(`Failed to download page ${displayZ}:`, 
-                                    response ? response.error : "No response");
-                            }
-                        });
-                    } catch (e) {
-                        console.error(`Error processing canvas ${displayZ}:`, e);
-                    }
-                })();
-            } catch (e) {
-                console.error("Error processing canvas:", e);
-            }
+function extractCanvasData() {
+    const canvases = document.querySelectorAll('canvas.kix-canvas-tile-content');
+    if (canvases.length === 0) {
+        sendStatusMessage("downloadStatus", {
+            message: "Không tìm thấy canvas nào."
         });
-
-        if (skippedZIndexes.length > 0) {
-            chrome.runtime.sendMessage({
-                action: "downloadStatus", 
-                message: `⚠️ Bỏ qua Trang: ${[...new Set(skippedZIndexes)].join(', ')}`
-            });
-        }
-
-        return false; // Continue scrolling and processing
-    }
-
-    function checkCompletion() {
-        const missingZ = [];
-        for (let i = 0; i < totalPages; i++) {
-            if (!processedZIndexes.has(i)) {
-                missingZ.push(i + 1);
-            }
-        }
-        
-        chrome.runtime.sendMessage({
-            action: "waitingPages", 
-            pages: missingZ.length > 0 ? missingZ.join(', ') : "-"
-        });
-        
-        console.log(`Checking completion: ${processedZIndexes.size}/${totalPages}, missing: ${missingZ.length}`);
-        
-        if (processedZIndexes.size >= totalPages && missingZ.length === 0) {
-            chrome.runtime.sendMessage({
-                action: "downloadComplete"
-            });
-            isDownloading = false;
-            console.log("Download complete!");
-            return true;
-        }
+        isDownloading = false;
         return false;
     }
 
-    function autoScroll() {
-        window.scrollBy(0, window.innerHeight);
+    const pageTitle = sanitizeFileName(document.title);
+    const skippedZIndexes = [];
+    
+    // Process canvases
+    Array.from(canvases).forEach((canvas) => {
+        try {
+            processCanvas(canvas, pageTitle, skippedZIndexes);
+        } catch (e) {
+            console.error("Error processing canvas:", e);
+        }
+    });
+
+    if (skippedZIndexes.length > 0) {
+        sendStatusMessage("downloadStatus", {
+            message: `⚠️ Bỏ qua Trang: ${[...new Set(skippedZIndexes)].join(', ')}`
+        });
     }
 
-    function startExtraction() {
-        const done = extractCanvasData();
-        if (!done && isDownloading) {
-            autoScroll();
-            setTimeout(startExtraction, 1000);
+    return false; // Continue scrolling and processing
+}
+
+function processCanvas(canvas, pageTitle, skippedZIndexes) {
+    const rawZ = parseInt(getComputedStyle(canvas).zIndex || "-1");
+    const displayZ = rawZ + 1;
+
+    if (isNaN(rawZ) || processedZIndexes.has(rawZ)) {
+        skippedZIndexes.push(displayZ);
+        return;
+    }
+
+    (async () => {
+        try {
+            const dataURL = canvas.toDataURL("image/png");
+            const fileName = `${displayZ}_${pageTitle}.png`;
+            
+            console.log(`Processing page ${displayZ}, sending download request`);
+            
+            // Use Chrome's downloads API to save the file
+            chrome.runtime.sendMessage({
+                action: "downloadFile",
+                dataUrl: dataURL,
+                fileName: fileName,
+                folderName: downloadFolderName
+            }, response => {
+                handleDownloadResponse(response, rawZ, displayZ);
+            });
+        } catch (e) {
+            console.error(`Error processing canvas ${displayZ}:`, e);
+        }
+    })();
+}
+
+function handleDownloadResponse(response, rawZ, displayZ) {
+    console.log(`Received response for page ${displayZ}:`, response);
+    
+    if (response && response.success) {
+        processedZIndexes.add(rawZ);
+        
+        // Send updated list of all downloaded pages
+        const allDownloadedPages = Array.from(processedZIndexes)
+            .map(x => x + 1)
+            .sort((a, b) => a - b);
+        
+        sendStatusMessage("downloadedPages", {
+            pages: allDownloadedPages.join(', ')
+        });
+        
+        // Check if we're done
+        checkCompletion();
+    } else {
+        console.error(`Failed to download page ${displayZ}:`, 
+            response ? response.error : "No response");
+    }
+}
+
+function checkCompletion() {
+    const missingZ = [];
+    for (let i = 0; i < totalPages; i++) {
+        if (!processedZIndexes.has(i)) {
+            missingZ.push(i + 1);
         }
     }
+    
+    sendStatusMessage("waitingPages", {
+        pages: missingZ.length > 0 ? missingZ.join(', ') : "-"
+    });
+    
+    console.log(`Checking completion: ${processedZIndexes.size}/${totalPages}, missing: ${missingZ.length}`);
+    
+    if (processedZIndexes.size >= totalPages && missingZ.length === 0) {
+        sendStatusMessage("downloadComplete", {});
+        isDownloading = false;
+        console.log("Download complete!");
+        return true;
+    }
+    return false;
+}
 
-    startExtraction();
+function autoScroll() {
+    window.scrollBy(0, window.innerHeight);
+}
+
+function startExtraction() {
+    const done = extractCanvasData();
+    if (!done && isDownloading) {
+        autoScroll();
+        setTimeout(startExtraction, 1000);
+    }
 }
