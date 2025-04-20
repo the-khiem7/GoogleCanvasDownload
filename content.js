@@ -3,6 +3,7 @@ console.log("Google Canvas Download content script loaded");
 const processedZIndexes = new Set();
 let totalPages = 0;
 let isDownloading = false;
+let downloadFolderName = '';
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -20,7 +21,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         
         if (!isDownloading) {
             isDownloading = true;
-            requestDirectoryAndDownload();
+            startDownloadProcess();
             sendResponse({status: "started"});
         } else {
             sendResponse({status: "already_downloading"});
@@ -29,35 +30,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
 });
 
-// Hàm yêu cầu người dùng chọn thư mục (sử dụng File System Access API)
-async function getDirectoryHandle() {
-    try {
-        const dirHandle = await window.showDirectoryPicker();
-        return dirHandle;
-    } catch (error) {
-        console.error("Directory selection error:", error);
-        chrome.runtime.sendMessage({
-            action: "downloadError",
-            error: "Không thể chọn thư mục: " + error.message
-        });
-        isDownloading = false;
-        return null;
-    }
-}
-
-// Yêu cầu người dùng chọn thư mục
-async function requestDirectoryAndDownload() {
+// Start the download process without requiring directory selection
+async function startDownloadProcess() {
     chrome.runtime.sendMessage({
         action: "downloadStatus",
-        message: "⏳ Đang chờ chọn thư mục..."
+        message: "🔄 Đang chuẩn bị tải xuống..."
     });
 
-    const directoryHandle = await getDirectoryHandle();
-    if (!directoryHandle) return;
-
+    // Get the document title for folder name
+    downloadFolderName = document.title.replace(/[\\/:*?"<>|]/g, '_');
+    
     chrome.runtime.sendMessage({
         action: "downloadStatus",
-        message: "🔄 Bắt đầu tải xuống..."
+        message: `🔄 Tải xuống vào thư mục: "${downloadFolderName}"`
     });
 
     function extractCanvasData() {
@@ -88,21 +73,46 @@ async function requestDirectoryAndDownload() {
             try {
                 const dataURL = canvas.toDataURL("image/png");
                 const fileName = `${pageTitle}_${displayZ}.png`;
-
-                // Chuyển đổi Base64 thành blob
-                const response = await fetch(dataURL);
-                const blob = await response.blob();
-
-                // Lưu file vào thư mục được chọn
-                if (directoryHandle) {
-                    const fileHandle = await directoryHandle.getFileHandle(fileName, { create: true });
-                    const writableStream = await fileHandle.createWritable();
-                    await writableStream.write(blob);
-                    await writableStream.close();
-                }
-
-                processedZIndexes.add(rawZ);
-                downloadedThisRound.push(displayZ);
+                
+                // Use Chrome's downloads API to save the file
+                chrome.runtime.sendMessage({
+                    action: "downloadFile",
+                    dataUrl: dataURL,
+                    fileName: fileName,
+                    folderName: downloadFolderName
+                }, response => {
+                    if (response && response.success) {
+                        processedZIndexes.add(rawZ);
+                        downloadedThisRound.push(displayZ);
+                        
+                        // Send updated list of all downloaded pages
+                        const allDownloadedPages = Array.from(processedZIndexes).map(x => x + 1).sort((a, b) => a - b);
+                        chrome.runtime.sendMessage({
+                            action: "downloadedPages", 
+                            pages: allDownloadedPages.join(', ')
+                        });
+                        
+                        // Check if we're done
+                        const missingZ = [];
+                        for (let i = 0; i < totalPages; i++) {
+                            if (!processedZIndexes.has(i)) {
+                                missingZ.push(i + 1);
+                            }
+                        }
+                        
+                        if (processedZIndexes.size >= totalPages && missingZ.length === 0) {
+                            chrome.runtime.sendMessage({
+                                action: "downloadComplete"
+                            });
+                            isDownloading = false;
+                        } else {
+                            chrome.runtime.sendMessage({
+                                action: "waitingPages", 
+                                pages: missingZ.join(', ')
+                            });
+                        }
+                    }
+                });
             } catch (error) {
                 console.error(`Error processing canvas ${displayZ}:`, error);
                 chrome.runtime.sendMessage({
@@ -112,54 +122,14 @@ async function requestDirectoryAndDownload() {
             }
         });
 
-        // After all processing is done
-        Promise.all(promises).then(() => {
-            if (skippedZIndexes.length > 0) {
-                chrome.runtime.sendMessage({
-                    action: "downloadStatus", 
-                    message: `⚠️ Bỏ qua Trang: ${[...new Set(skippedZIndexes)].join(', ')}`
-                });
-            }
+        if (skippedZIndexes.length > 0) {
+            chrome.runtime.sendMessage({
+                action: "downloadStatus", 
+                message: `⚠️ Bỏ qua Trang: ${[...new Set(skippedZIndexes)].join(', ')}`
+            });
+        }
 
-            // Process results after all downloads are complete
-            // Kiểm tra liền mạch
-            const missingZ = [];
-            for (let i = 0; i < totalPages; i++) {
-                if (!processedZIndexes.has(i)) {
-                    missingZ.push(i + 1);
-                }
-            }
-
-            // Nổi bật log "Trang đang chờ" với màu đen
-            if (missingZ.length > 0) {
-                chrome.runtime.sendMessage({
-                    action: "waitingPages", 
-                    pages: missingZ.join(', ')
-                });
-            }
-
-            // Send all downloaded pages, not just from this round
-            const allDownloadedPages = Array.from(processedZIndexes).map(x => x + 1).sort((a, b) => a - b);
-            
-            if (allDownloadedPages.length > 0) {
-                console.log("Sending downloaded pages:", allDownloadedPages.join(', '));
-                chrome.runtime.sendMessage({
-                    action: "downloadedPages", 
-                    pages: allDownloadedPages.join(', ')
-                });
-            }
-
-            // Nếu đủ trang và không thiếu => dừng
-            if (processedZIndexes.size >= totalPages && missingZ.length === 0) {
-                chrome.runtime.sendMessage({
-                    action: "downloadComplete"
-                });
-                isDownloading = false;
-                return true;
-            }
-        });
-
-        return false;
+        return false; // Always return false to continue scrolling and processing
     }
 
     function autoScroll() {
@@ -168,9 +138,9 @@ async function requestDirectoryAndDownload() {
 
     function startExtraction() {
         const done = extractCanvasData();
-        if (!done) {
+        if (!done && isDownloading) {
             autoScroll();
-            setTimeout(startExtraction, 1000);  // Giảm thời gian delay xuống 1 giây
+            setTimeout(startExtraction, 1000);
         }
     }
 

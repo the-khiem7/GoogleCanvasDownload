@@ -93,6 +93,26 @@ document.addEventListener('DOMContentLoaded', function() {
   chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     console.log("Popup received message:", request);
     
+    if (request.action === "downloadFile") {
+      // Handle download request from content script
+      const folderPath = request.folderName || "GoogleCanvasDownload";
+      
+      chrome.downloads.download({
+        url: request.dataUrl,
+        filename: folderPath + '/' + request.fileName,
+        saveAs: false
+      }, downloadId => {
+        if (chrome.runtime.lastError) {
+          console.error("Download error:", chrome.runtime.lastError);
+          sendResponse({success: false, error: chrome.runtime.lastError.message});
+        } else {
+          sendResponse({success: true, downloadId: downloadId});
+        }
+      });
+      
+      return true; // Required for async sendResponse
+    }
+    
     switch(request.action) {
       case "downloadStatus":
         statusMessage.textContent = request.message;
