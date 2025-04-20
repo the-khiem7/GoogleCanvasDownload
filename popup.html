@@ -20,7 +20,7 @@
       gap: 10px;
       align-items: center;
     }
-    #startBtn {
+    #startBtn, #openFolderBtn {
       background-color: #4285F4;
       color: white;
       border: none;
@@ -28,12 +28,20 @@
       border-radius: 4px;
       cursor: pointer;
     }
-    #startBtn:hover {
+    #startBtn:hover, #openFolderBtn:hover {
       background-color: #3367D6;
     }
-    #startBtn:disabled {
+    #startBtn:disabled, #openFolderBtn:disabled {
       background-color: #ccc;
       cursor: not-allowed;
+    }
+    #openFolderBtn {
+      display: none;
+      background-color: #34A853;
+      margin-top: 10px;
+    }
+    #openFolderBtn:hover {
+      background-color: #2E8B57;
     }
     .status {
       margin-top: 15px;
@@ -66,6 +74,7 @@
       <input type="number" id="totalPages" min="1" value="10">
     </div>
     <button id="startBtn">Bắt đầu Tải</button>
+    <button id="openFolderBtn">Mở Thư Mục</button>
     
     <div class="status">
       <div id="statusMessage"></div>

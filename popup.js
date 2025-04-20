@@ -1,9 +1,14 @@
 document.addEventListener('DOMContentLoaded', function() {
   const startButton = document.getElementById('startBtn');
+  const openFolderButton = document.getElementById('openFolderBtn');
   const totalPagesInput = document.getElementById('totalPages');
   const statusMessage = document.getElementById('statusMessage');
   const downloadedPagesElement = document.getElementById('downloadedPages');
   const waitingPagesElement = document.getElementById('waitingPages');
+  
+  // Track the first download ID and folder name to enable opening the folder later
+  let firstDownloadId = null;
+  let currentFolderName = null;
   
   // Set initial button state
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -23,6 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
       statusMessage.className = "error";
       return;
     }
+    
+    // Reset the download tracking variables
+    firstDownloadId = null;
+    currentFolderName = null;
+    openFolderButton.style.display = "none";
     
     // Show loading status
     startButton.disabled = true;
@@ -67,6 +77,13 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
   
+  // Add click event for the open folder button
+  openFolderButton.addEventListener('click', function() {
+    if (firstDownloadId) {
+      chrome.downloads.show(firstDownloadId);
+    }
+  });
+  
   function sendStartDownloadMessage(tabId, totalPages) {
     chrome.tabs.sendMessage(
       tabId,
@@ -96,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (request.action === "downloadFile") {
       // Handle download request from content script
       const folderPath = request.folderName || "GoogleCanvasDownload";
+      currentFolderName = folderPath;
       
       chrome.downloads.download({
         url: request.dataUrl,
@@ -106,6 +124,10 @@ document.addEventListener('DOMContentLoaded', function() {
           console.error("Download error:", chrome.runtime.lastError);
           sendResponse({success: false, error: chrome.runtime.lastError.message});
         } else {
+          // Store the first download ID to enable opening the folder later
+          if (firstDownloadId === null) {
+            firstDownloadId = downloadId;
+          }
           sendResponse({success: true, downloadId: downloadId});
         }
       });
@@ -138,6 +160,11 @@ document.addEventListener('DOMContentLoaded', function() {
         statusMessage.className = "success";
         startButton.disabled = false;
         waitingPagesElement.textContent = "-";
+        
+        // Show the Open Folder button if we have a download ID
+        if (firstDownloadId !== null) {
+          openFolderButton.style.display = "block";
+        }
         break;
         
       case "downloadError":
