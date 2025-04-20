@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Google Canvas Download",
-  "version": "1.0",
+  "version": "1.4",
   "description": "Download canvas images from Google Docs",
-  "permissions": ["activeTab", "scripting", "downloads"],
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["*://docs.google.com/*"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": "icon.png"
@@ -11,7 +12,14 @@
   "content_scripts": [
     {
       "matches": ["*://docs.google.com/*"],
-      "js": ["content.js"]
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js"],
+      "matches": ["*://docs.google.com/*"]
     }
   ],
   "icons": {
