@@ -104,7 +104,8 @@ function startDownloadProcess() {
                 (async () => {
                     try {
                         const dataURL = canvas.toDataURL("image/png");
-                        const fileName = `${pageTitle}_${displayZ}.png`;
+                        // Changed naming format: page number first, then document title
+                        const fileName = `${displayZ}_${pageTitle}.png`;
                         
                         console.log(`Processing page ${displayZ}, sending download request`);
                         
