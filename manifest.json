@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Google Canvas Download",
+  "version": "1.0",
+  "description": "Download canvas images from Google Docs",
+  "permissions": ["activeTab", "scripting", "downloads"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://docs.google.com/*"],
+      "js": ["content.js"]
+    }
+  ],
+  "icons": {
+    "128": "icon.png"
+  }
+}
