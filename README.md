@@ -1,46 +1,48 @@
 # Google Canvas Download
 
-A tool to download and save Google Canvas drawings locally.
+A Chrome extension to download Google Docs pages as images.
 
 ## Description
 
-This project allows users to download drawings from Google Canvas and save them to their local machine. It's useful for backing up or archiving your Google Canvas artwork.
+This Chrome extension allows you to download Google Docs pages as PNG images. It captures each page of a Google Doc as a high-quality image, making it useful for backing up documents, sharing content in image format, or preserving the exact visual appearance of your documents.
 
 ## Features
 
-- Download Google Canvas drawings
-- Save drawings in their original format
-- Preserve drawing quality and metadata
-- Easy-to-use interface
+- Download Google Docs pages as PNG images
+- Automatically process all pages in a document
+- Save images with organized page numbering
+- Progress tracking during download
+- Maintains visual fidelity of document content
+- Creates organized folder structure for downloads
 
 ## Installation
 
-1. Clone this repository:
+1. Download or clone this repository:
 ```bash
 git clone https://github.com/yourusername/GoogleCanvasDownload.git
 ```
 
-2. Install dependencies:
-```bash
-npm install
-```
+2. Load the extension in Chrome:
+   - Open Chrome and navigate to `chrome://extensions/`
+   - Enable "Developer mode" (toggle in top-right)
+   - Click "Load unpacked" and select the GoogleCanvasDownload directory
 
 ## Usage
 
-1. Run the application:
-```bash
-npm start
-```
-
-2. Follow the prompts to authenticate with your Google account
-3. Select the Canvas drawings you want to download
-4. Choose your save location
+1. Open a Google Doc in Chrome
+2. Click the extension icon in your browser toolbar
+3. Enter the number of pages in the document
+4. Click "Download" to start the process
+5. The extension will:
+   - Capture each page as a PNG image
+   - Save files with format: `[page_number]_[document_title].png`
+   - Show progress and completion status
 
 ## Requirements
 
-- Node.js (v14 or higher)
-- Google Account with Canvas drawings
-- Internet connection
+- Google Chrome browser
+- Access to Google Docs
+- Permission to download files to your local machine
 
 ## Contributing
 
@@ -52,7 +54,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Author
 
-[Your Name]
+Nguyen Van Duy Khiem
 
 ## Acknowledgments
 
