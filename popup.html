@@ -219,74 +219,140 @@
     .progress-container {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 20px;
     }
     
     .progress-item {
       background: white;
-      padding: 14px 16px;
-      border-radius: 10px;
+      padding: 18px;
+      border-radius: 12px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      gap: 12px;
+      box-shadow: 0 3px 12px rgba(0,0,0,0.06);
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      border-bottom: 3px solid var(--primary-color);
+    }
+    
+    .progress-item:nth-child(2) {
+      border-bottom-color: #fbbc05;
     }
     
     .progress-header {
       display: flex;
-      justify-content: space-between;
+      flex-direction: column;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+      gap: 10px;
+    }
+    
+    .progress-title-row {
+      display: flex;
       align-items: center;
+      width: 100%;
     }
     
     .status-label {
-      font-weight: 500;
-      font-size: 14px;
-      color: #666;
+      font-weight: 600;
+      font-size: 15px;
+      color: #444;
+      position: relative;
+      margin-left: 8px;
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
     }
     
-    #waitingPages, #downloadedPages {
-      font-weight: 600;
-      font-size: 18px;
+    .status-label::before {
+      content: "•";
+      display: inline-block;
+      margin-right: 5px;
+      font-size: 20px;
       color: var(--primary-color);
     }
     
+    .progress-item:nth-child(2) .status-label::before {
+      color: #fbbc05;
+    }
+    
     .progress-bar-container {
-      height: 8px;
-      width: 100%;
-      background-color: var(--light-gray);
+      flex: 1;
+      height: 6px;
+      background-color: #eaeaea;
       border-radius: 4px;
       overflow: hidden;
+      position: relative;
+      z-index: 2;
+      margin-left: 15px;
     }
     
     .progress-bar {
       height: 100%;
       width: 0%;
-      background: var(--gradient);
       border-radius: 4px;
-      transition: width 0.3s ease;
+      transition: width 0.4s ease-out;
+      position: relative;
     }
     
-    #downloadedBar {
-      background: var(--gradient);
+    #downloadedPages, #waitingPages {
+      font-weight: 600;
+      font-size: 18px;
+      padding: 3px 10px;
+      border-radius: 4px;
+      display: inline-block;
+      min-width: 24px;
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
+      align-self: center;
     }
     
-    #waitingBar {
-      background: linear-gradient(135deg, #fbbc05, #ea4335);
+    #downloadedPages {
+      color: var(--primary-color);
+      background: rgba(66, 133, 244, 0.1);
+    }
+    
+    #waitingPages {
+      color: #f57c00;
+      background: rgba(251, 188, 5, 0.1);
+    }
+    
+    .progress-item::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+      opacity: 0.6;
+      border-radius: 50%;
+      transform: translate(50%, -50%);
+      z-index: 1;
     }
     
     .success {
       color: var(--success-color);
       background-color: rgba(52, 168, 83, 0.1);
+      border-left: 4px solid var(--success-color);
+      padding-left: 15px;
     }
     
     .error {
       color: #ea4335;
       background-color: rgba(234, 67, 53, 0.1);
+      border-left: 4px solid #ea4335;
+      padding-left: 15px;
     }
     
     .warning {
       color: #fbbc05;
       background-color: rgba(251, 188, 5, 0.1);
+      border-left: 4px solid #fbbc05;
+      padding-left: 15px;
     }
     
     .note {
@@ -323,20 +389,24 @@
         <div class="progress-container">
           <div class="progress-item">
             <div class="progress-header">
-              <span class="status-label">Đã tải</span>
+              <div class="progress-title-row">
+                <span class="status-label">Đã tải</span>
+                <div class="progress-bar-container">
+                  <div id="downloadedBar" class="progress-bar"></div>
+                </div>
+              </div>
               <span id="downloadedPages">-</span>
-            </div>
-            <div class="progress-bar-container">
-              <div id="downloadedBar" class="progress-bar"></div>
             </div>
           </div>
           <div class="progress-item">
             <div class="progress-header">
-              <span class="status-label">Đang chờ</span>
+              <div class="progress-title-row">
+                <span class="status-label">Đang chờ</span>
+                <div class="progress-bar-container">
+                  <div id="waitingBar" class="progress-bar"></div>
+                </div>
+              </div>
               <span id="waitingPages">-</span>
-            </div>
-            <div class="progress-bar-container">
-              <div id="waitingBar" class="progress-bar"></div>
             </div>
           </div>
         </div>
