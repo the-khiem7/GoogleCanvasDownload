@@ -222,6 +222,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const downloaded = parseInt(request.pages) || 0;
             const percentComplete = Math.min(100, Math.round((downloaded / totalPagesCount) * 100));
             downloadedBarElement.style.width = percentComplete + '%';
+            console.log("Updated downloadedBar width to", percentComplete + '%'); // Add logging
           }
         }
         break;
@@ -235,9 +236,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const waiting = parseInt(request.pages) || 0;
             const percentWaiting = Math.min(100, Math.round((waiting / totalPagesCount) * 100));
             waitingBarElement.style.width = percentWaiting + '%';
+            console.log("Updated waitingBar width to", percentWaiting + '%'); // Add logging
           } else {
             // If we're in initial "Đang tải..." state
             waitingBarElement.style.width = '100%';
+            console.log("Set waitingBar to 100% (loading state)"); // Add logging
           }
         }
         break;
@@ -331,5 +334,32 @@ document.addEventListener('DOMContentLoaded', function() {
       console.error("Error detecting page count:", error);
       return null;
     }
+  }
+  
+  // Add this debugging function to check if the progress bar elements exist
+  function checkProgressBarElements() {
+    console.log("Progress bar elements check:");
+    console.log("downloadedBarElement exists:", !!downloadedBarElement);
+    console.log("waitingBarElement exists:", !!waitingBarElement);
+    
+    if (downloadedBarElement) {
+      console.log("downloadedBarElement current width:", downloadedBarElement.style.width);
+    }
+    
+    if (waitingBarElement) {
+      console.log("waitingBarElement current width:", waitingBarElement.style.width);
+    }
+  }
+  
+  // Call this check after DOM is loaded
+  setTimeout(checkProgressBarElements, 500);
+  
+  // Also initialize the progress bars to ensure they're visible
+  if (downloadedBarElement) {
+    downloadedBarElement.style.width = '0%';
+  }
+  
+  if (waitingBarElement) {
+    waitingBarElement.style.width = '0%';
   }
 });

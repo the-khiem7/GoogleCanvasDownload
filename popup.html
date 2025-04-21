@@ -287,14 +287,26 @@
       position: relative;
       z-index: 2;
       margin-left: 15px;
+      min-width: 150px; /* Add minimum width */
     }
     
     .progress-bar {
       height: 100%;
-      width: 0%;
+      width: 0%; /* Initial width */
+      min-width: 0;
       border-radius: 4px;
       transition: width 0.4s ease-out;
       position: relative;
+      display: block;
+      background-color: #4285F4; /* Default color */
+    }
+    
+    #downloadedBar {
+      background-color: var(--primary-color);
+    }
+    
+    #waitingBar {
+      background-color: #fbbc05;
     }
     
     #downloadedPages, #waitingPages {
