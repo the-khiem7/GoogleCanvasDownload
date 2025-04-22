@@ -5,6 +5,7 @@ const processedZIndexes = new Set();
 let totalPages = 0;
 let isDownloading = false;
 let downloadFolderName = '';
+let activeTabId = null; // Add tab ID tracking
 
 // Utility functions
 function sanitizeFileName(name) {
@@ -53,6 +54,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 handleStartDownload(request, sendResponse);
                 break;
                 
+            case "stopDownload":
+                isDownloading = false;
+                console.log("Download stopped by popup");
+                sendResponse({status: "stopped"});
+                break;
+
             default:
                 console.log(`Unhandled action: ${request.action}`);
                 sendResponse({status: "unknown_action"});
@@ -72,7 +79,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Handle download start request
 function handleStartDownload(request, sendResponse) {
     totalPages = request.totalPages;
-    console.log(`Start download request for ${totalPages} pages, current status: ${isDownloading ? 'downloading' : 'idle'}`);
+    activeTabId = request.tabId; // Store tab ID
+    console.log(`Start download request for ${totalPages} pages, tab: ${activeTabId}`);
     
     if (!isDownloading) {
         isDownloading = true;
@@ -108,6 +116,15 @@ function startDownloadProcess() {
 }
 
 function extractCanvasData() {
+    // Check active tab through messaging
+    chrome.runtime.sendMessage({action: "checkActiveTab", tabId: activeTabId}, response => {
+        if (response && !response.isActiveTab) {
+            console.log('Tab changed, stopping download');
+            isDownloading = false;
+            return true;
+        }
+    });
+
     if (!chrome.runtime?.id) {
         console.log('Extension context invalid, stopping process');
         isDownloading = false;

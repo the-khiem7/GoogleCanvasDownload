@@ -506,3 +506,21 @@ body {
   background-color: rgba(52, 168, 83, 0.1);
   border: 1px solid var(--success-color);
 }
+
+.reload-btn {
+  background-color: #fbbc05;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.reload-btn:hover {
+  background-color: #f57c00;
+  animation: pulse 1.5s ease infinite;
+}

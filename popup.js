@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const statusMessage = document.getElementById('statusMessage');
   const detectPagesBtn = document.getElementById('detectPages');
   const pagesGrid = document.getElementById('pagesGrid');
+  const reloadBtn = document.getElementById('reloadBtn');
   
   // Track total pages and state
   let totalPagesCount = 0;
@@ -109,6 +110,39 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // Clear grid if no valid state
             pagesGrid.innerHTML = '';
+        }
+    });
+  }
+
+  // Add after other function declarations
+  function resetUI(preserveInputs = false) {
+    // Initialize grid with default state
+    pagesGrid.className = 'pages-grid';
+    pagesGrid.innerHTML = '';
+    
+    // Reset all UI elements
+    statusMessage.textContent = '';
+    statusMessage.className = '';
+    startButton.disabled = false;
+    startButton.textContent = "Bắt đầu Tải";
+    openFolderButton.style.display = "none";
+    detectPagesBtn.textContent = "Phát hiện";
+    
+    // Reset all state variables
+    isProcessing = false;
+    firstDownloadId = null;
+    
+    if (!preserveInputs) {
+        totalPagesCount = 0;
+        totalPagesInput.value = "10";
+    }
+
+    // Check if we're on Google Docs and enable/disable accordingly
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (!tabs[0]?.url.includes('docs.google.com')) {
+            startButton.disabled = true;
+            statusMessage.textContent = "❌ Này chỉ hoạt động trên Google Docs";
+            statusMessage.className = "error";
         }
     });
   }
@@ -223,7 +257,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     chrome.tabs.sendMessage(
       tabId,
-      {action: "startDownload", totalPages: totalPages},
+      {
+          action: "startDownload", 
+          totalPages: totalPages,
+          tabId: tabId // Add tab ID to request
+      },
       function(response) {
         if (chrome.runtime.lastError) {
           handleError(`Không thể kết nối với trang: ${chrome.runtime.lastError.message}`);
@@ -251,6 +289,14 @@ document.addEventListener('DOMContentLoaded', function() {
   chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     logStatus(`Received message: ${request.action}`);
     
+    if (request.action === "checkActiveTab") {
+        chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+            const isActiveTab = tabs[0]?.id === request.tabId;
+            sendResponse({isActiveTab: isActiveTab});
+        });
+        return true; // Keep channel open for async response
+    }
+
     if (request.action === "downloadFile") {
       // Handle download request from content script
       const folderPath = request.folderName || "GoogleCanvasDownload";
@@ -439,14 +485,21 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
 
-  // Add tab activation listener
+  // Replace tab activation listener
   chrome.tabs.onActivated.addListener(function(activeInfo) {
     chrome.tabs.get(activeInfo.tabId, function(tab) {
         if (tab.url?.includes('docs.google.com')) {
+            // Stop previous download if any
+            if (currentTabId && currentTabId !== activeInfo.tabId) {
+                chrome.tabs.sendMessage(currentTabId, {action: "stopDownload"});
+                chrome.storage.local.remove('downloadState');
+            }
+            
             currentTabId = tab.id;
-            restoreState();
+            resetUI(true); // Reset UI but preserve input values
+            restoreState(); // Try to restore state for new tab
         } else {
-            pagesGrid.innerHTML = '';
+            resetUI();
             chrome.storage.local.remove('downloadState');
         }
     });
@@ -457,5 +510,25 @@ document.addEventListener('DOMContentLoaded', function() {
     if (currentTabId) {
         chrome.storage.local.remove('downloadState');
     }
+  });
+
+  // Update reload button handler to use resetUI
+  reloadBtn.addEventListener('click', function() {
+    // Clear storage first
+    chrome.storage.local.remove('downloadState');
+    
+    // Full UI reset
+    resetUI();
+    
+    // Re-query current tab
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (tabs[0]?.url.includes('docs.google.com')) {
+            currentTabId = tabs[0].id;
+            if (currentTabId) {
+                // Stop any ongoing downloads
+                chrome.tabs.sendMessage(currentTabId, {action: "stopDownload"});
+            }
+        }
+    });
   });
 });
