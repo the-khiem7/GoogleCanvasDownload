@@ -473,3 +473,36 @@ body {
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   }
 }
+
+.pages-container {
+  padding: 15px;
+}
+
+.pages-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(45px, 1fr));
+  gap: 8px;
+  margin-top: 15px;
+}
+
+.page-item {
+  background: #f5f5f5;
+  border-radius: 6px;
+  padding: 8px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.page-pending {
+  color: #ea4335;
+  background-color: rgba(234, 67, 53, 0.1);
+  border: 1px solid #ea4335;
+}
+
+.page-downloaded {
+  color: var(--success-color);
+  background-color: rgba(52, 168, 83, 0.1);
+  border: 1px solid var(--success-color);
+}

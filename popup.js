@@ -3,21 +3,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const openFolderButton = document.getElementById('openFolderBtn');
   const totalPagesInput = document.getElementById('totalPages');
   const statusMessage = document.getElementById('statusMessage');
-  const downloadedPagesElement = document.getElementById('downloadedPages');
-  const waitingPagesElement = document.getElementById('waitingPages');
   const detectPagesBtn = document.getElementById('detectPages');
+  const pagesGrid = document.getElementById('pagesGrid');
   
-  // Add references to the new progress bars
-  const downloadedBarElement = document.getElementById('downloadedBar');
-  const waitingBarElement = document.getElementById('waitingBar');
-  
-  // Track total pages for progress calculations
+  // Track total pages and state
   let totalPagesCount = 0;
-  
-  // Track the first download ID and folder name to enable opening the folder later
   let firstDownloadId = null;
   let currentFolderName = null;
-  let isProcessing = false; // Global flag for tracking button state
+  let isProcessing = false;
   
   console.log("Popup initialized");
   
@@ -65,17 +58,14 @@ document.addEventListener('DOMContentLoaded', function() {
     startButton.textContent = "Đang xử lý...";
     statusMessage.textContent = "⏳ Đang khởi động...";
     statusMessage.className = "";
-    downloadedPagesElement.textContent = "-";
-    waitingPagesElement.textContent = "-";
     
     // Reset download tracking
     firstDownloadId = null;
     currentFolderName = null;
     openFolderButton.style.display = "none";
     
-    // Reset progress bars
-    downloadedBarElement.style.width = '0%';
-    waitingBarElement.style.width = '0%';
+    // Initialize the pages grid
+    initializePagesGrid(totalPages);
     
     logStatus("Querying active tab");
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
@@ -155,8 +145,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (response && response.status === "started") {
           logStatus("Download process started");
           // State is already set, just update UI
-          downloadedPagesElement.textContent = "-";
-          waitingPagesElement.textContent = "Đang tải...";
         } else if (response && response.status === "already_downloading") {
           statusMessage.textContent = "⚠️ Đã có quá trình tải đang chạy!";
           statusMessage.className = "warning";
@@ -215,32 +203,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
       case "downloadedPages":
         if (request.pages && request.pages.length > 0) {
-          downloadedPagesElement.textContent = request.pages;
+          const downloadedPages = request.pages.split(',').map(p => parseInt(p.trim()));
           
-          // Update progress bar if we have total pages info
-          if (totalPagesCount > 0) {
-            const downloaded = parseInt(request.pages) || 0;
-            const percentComplete = Math.min(100, Math.round((downloaded / totalPagesCount) * 100));
-            downloadedBarElement.style.width = percentComplete + '%';
-            console.log("Updated downloadedBar width to", percentComplete + '%'); // Add logging
-          }
-        }
-        break;
-        
-      case "waitingPages":
-        if (request.pages && request.pages.length > 0) {
-          waitingPagesElement.textContent = request.pages;
-          
-          // Update waiting progress bar if we have total pages info
-          if (totalPagesCount > 0 && request.pages !== '-') {
-            const waiting = parseInt(request.pages) || 0;
-            const percentWaiting = Math.min(100, Math.round((waiting / totalPagesCount) * 100));
-            waitingBarElement.style.width = percentWaiting + '%';
-            console.log("Updated waitingBar width to", percentWaiting + '%'); // Add logging
-          } else {
-            // If we're in initial "Đang tải..." state
-            waitingBarElement.style.width = '100%';
-            console.log("Set waitingBar to 100% (loading state)"); // Add logging
+          // Update page items in the grid
+          for (let i = 1; i <= totalPagesCount; i++) {
+            const pageItem = document.getElementById(`page-${i}`);
+            if (pageItem) {
+              if (downloadedPages.includes(i)) {
+                pageItem.className = 'page-item page-downloaded';
+              } else {
+                pageItem.className = 'page-item page-pending';
+              }
+            }
           }
         }
         break;
@@ -250,12 +224,15 @@ document.addEventListener('DOMContentLoaded', function() {
         statusMessage.className = "success";
         startButton.disabled = false;
         startButton.textContent = "Bắt đầu Tải";
-        waitingPagesElement.textContent = "-";
         isProcessing = false;
         
-        // Complete the progress bars
-        downloadedBarElement.style.width = '100%';
-        waitingBarElement.style.width = '0%';
+        // Mark all pages as downloaded
+        for (let i = 1; i <= totalPagesCount; i++) {
+          const pageItem = document.getElementById(`page-${i}`);
+          if (pageItem) {
+            pageItem.className = 'page-item page-downloaded';
+          }
+        }
         
         // Show the Open Folder button if we have a download ID
         if (firstDownloadId !== null) {
@@ -361,5 +338,18 @@ document.addEventListener('DOMContentLoaded', function() {
   
   if (waitingBarElement) {
     waitingBarElement.style.width = '0%';
+  }
+
+  function initializePagesGrid(totalPages) {
+    pagesGrid.className = 'pages-grid';
+    pagesGrid.innerHTML = '';
+    
+    for (let i = 1; i <= totalPages; i++) {
+      const pageItem = document.createElement('div');
+      pageItem.className = 'page-item page-pending';
+      pageItem.id = `page-${i}`;
+      pageItem.textContent = i;
+      pagesGrid.appendChild(pageItem);
+    }
   }
 });
