@@ -3,7 +3,7 @@
   "name": "Google Canvas Download",
   "version": "1.9",
   "description": "Download canvas images from Google Docs",
-  "permissions": ["activeTab", "scripting", "downloads"],
+  "permissions": ["activeTab", "scripting", "downloads", "storage", "tabs"],
   "host_permissions": ["*://docs.google.com/*"],
   "action": {
     "default_popup": "popup.html",

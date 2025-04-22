@@ -11,17 +11,21 @@ document.addEventListener('DOMContentLoaded', function() {
   let firstDownloadId = null;
   let currentFolderName = null;
   let isProcessing = false;
+  let currentTabId = null;
   
   console.log("Popup initialized");
   
   // Set initial button state
   chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
     // Check if we're on Google Docs
-    if (!tabs[0].url.includes('docs.google.com')) {
+    if (!tabs[0]?.url.includes('docs.google.com')) {
       startButton.disabled = true;
       statusMessage.textContent = "❌ Này chỉ hoạt động trên Google Docs";
       statusMessage.className = "error";
+      return;
     }
+    currentTabId = tabs[0].id;
+    restoreState();
   });
   
   // Add simple debug logging to the popup
@@ -31,6 +35,84 @@ document.addEventListener('DOMContentLoaded', function() {
     // statusMessage.textContent += "\n" + message;
   }
   
+  // Add storage cleanup function
+  function cleanupStorage() {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (!tabs[0] || !tabs[0].url.includes('docs.google.com')) {
+            chrome.storage.local.remove('downloadState');
+        }
+    });
+  }
+
+  // Check and cleanup storage on popup open
+  cleanupStorage();
+
+  // Add after variable declarations
+  chrome.storage.local.get(['downloadState'], function(result) {
+    if (result.downloadState) {
+        const state = result.downloadState;
+        totalPagesCount = state.totalPages;
+        isProcessing = state.isProcessing;
+        firstDownloadId = state.firstDownloadId;
+        
+        if (totalPagesCount > 0) {
+            totalPagesInput.value = totalPagesCount;
+            initializePagesGrid(totalPagesCount);
+            
+            if (state.downloadedPages) {
+                state.downloadedPages.forEach(pageNum => {
+                    const pageItem = document.getElementById(`page-${pageNum}`);
+                    if (pageItem) {
+                        pageItem.className = 'page-item page-downloaded';
+                    }
+                });
+            }
+            
+            if (state.isProcessing) {
+                startButton.disabled = true;
+                startButton.textContent = "Đang xử lý...";
+            }
+            
+            if (firstDownloadId) {
+                openFolderButton.style.display = "block";
+            }
+        }
+    }
+  });
+
+  // Add state restoration function
+  function restoreState() {
+    chrome.storage.local.get(['downloadState'], function(result) {
+        if (result.downloadState && result.downloadState.tabId === currentTabId) {
+            const state = result.downloadState;
+            totalPagesCount = state.totalPages;
+            isProcessing = state.isProcessing;
+            
+            if (totalPagesCount > 0) {
+                totalPagesInput.value = totalPagesCount;
+                initializePagesGrid(totalPagesCount);
+                
+                if (state.downloadedPages) {
+                    state.downloadedPages.forEach(pageNum => {
+                        const pageItem = document.getElementById(`page-${pageNum}`);
+                        if (pageItem) {
+                            pageItem.className = 'page-item page-downloaded';
+                        }
+                    });
+                }
+                
+                if (state.isProcessing) {
+                    startButton.disabled = true;
+                    startButton.textContent = "Đang xử lý...";
+                }
+            }
+        } else {
+            // Clear grid if no valid state
+            pagesGrid.innerHTML = '';
+        }
+    });
+  }
+
   // Modify the click event to use our global processing flag
   startButton.addEventListener('click', function() {
     console.log("Start button clicked, current state:", isProcessing ? "processing" : "ready");
@@ -50,6 +132,9 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
+    // Clear previous download state when starting new download
+    chrome.storage.local.remove('downloadState');
+
     // Set processing flag IMMEDIATELY on click
     isProcessing = true;
     startButton.disabled = true;
@@ -205,6 +290,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (request.pages && request.pages.length > 0) {
           const downloadedPages = request.pages.split(',').map(p => parseInt(p.trim()));
           
+          // Check storage size before setting
+          chrome.storage.local.getBytesInUse(null, function(bytesInUse) {
+            if (bytesInUse > 5000000) { // 5MB limit
+                console.warn('Storage limit approaching, clearing old data');
+                chrome.storage.local.remove('downloadState');
+            }
+            
+            // Only store essential data
+            chrome.storage.local.set({
+                downloadState: {
+                    tabId: currentTabId,
+                    totalPages: totalPagesCount,
+                    isProcessing: isProcessing,
+                    downloadedPages: downloadedPages
+                }
+            });
+          });
+
           // Update page items in the grid
           for (let i = 1; i <= totalPagesCount; i++) {
             const pageItem = document.getElementById(`page-${i}`);
@@ -238,6 +341,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (firstDownloadId !== null) {
           openFolderButton.style.display = "block";
         }
+
+        // Clear download state when complete
+        chrome.storage.local.remove('downloadState');
         break;
         
       case "downloadError":
@@ -325,4 +431,31 @@ document.addEventListener('DOMContentLoaded', function() {
       pagesGrid.appendChild(pageItem);
     }
   }
+
+  // Add tab update listener
+  chrome.tabs.onUpdated.addListener(function(tabId, changeInfo, tab) {
+    if (changeInfo.status === 'loading' && tab.url?.includes('docs.google.com')) {
+        chrome.storage.local.remove('downloadState');
+    }
+  });
+
+  // Add tab activation listener
+  chrome.tabs.onActivated.addListener(function(activeInfo) {
+    chrome.tabs.get(activeInfo.tabId, function(tab) {
+        if (tab.url?.includes('docs.google.com')) {
+            currentTabId = tab.id;
+            restoreState();
+        } else {
+            pagesGrid.innerHTML = '';
+            chrome.storage.local.remove('downloadState');
+        }
+    });
+  });
+
+  // Add window/tab close listener
+  window.addEventListener('unload', function() {
+    if (currentTabId) {
+        chrome.storage.local.remove('downloadState');
+    }
+  });
 });
