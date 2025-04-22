@@ -162,13 +162,16 @@ function processCanvas(canvas, pageTitle, skippedZIndexes) {
     })();
 }
 
+/**
+ * Handles the response from a download request and updates the UI
+ * @param {Object} response - The download response object
+ * @param {number} rawZ - The raw z-index value
+ * @param {number} displayZ - The display z-index value
+ */
 function handleDownloadResponse(response, rawZ, displayZ) {
-    console.log(`Received response for page ${displayZ}:`, response);
-    
     if (response && response.success) {
         processedZIndexes.add(rawZ);
         
-        // Send updated list of all downloaded pages
         const allDownloadedPages = Array.from(processedZIndexes)
             .map(x => x + 1)
             .sort((a, b) => a - b);
@@ -177,7 +180,6 @@ function handleDownloadResponse(response, rawZ, displayZ) {
             pages: allDownloadedPages.join(', ')
         });
         
-        // Check if we're done
         checkCompletion();
     } else {
         console.error(`Failed to download page ${displayZ}:`, 
@@ -185,6 +187,10 @@ function handleDownloadResponse(response, rawZ, displayZ) {
     }
 }
 
+/**
+ * Checks if all pages have been downloaded and handles completion
+ * @returns {boolean} True if download is complete, false otherwise
+ */
 function checkCompletion() {
     const missingZ = [];
     for (let i = 0; i < totalPages; i++) {
@@ -197,24 +203,29 @@ function checkCompletion() {
         pages: missingZ.length > 0 ? missingZ.join(', ') : "-"
     });
     
-    console.log(`Checking completion: ${processedZIndexes.size}/${totalPages}, missing: ${missingZ.length}`);
-    
     if (processedZIndexes.size >= totalPages && missingZ.length === 0) {
-        sendStatusMessage("downloadComplete", {});
         isDownloading = false;
-        console.log("Download complete!");
+        sendStatusMessage("downloadComplete", {});
         return true;
     }
     return false;
 }
 
+/**
+ * Scrolls the window by one viewport height
+ */
 function autoScroll() {
     window.scrollBy(0, window.innerHeight);
 }
 
 function startExtraction() {
+    if (!isDownloading) {  // Add this check
+        console.log("Download process stopped");
+        return;
+    }
+
     const done = extractCanvasData();
-    if (!done && isDownloading) {
+    if (!done && isDownloading) {  // Check isDownloading again
         autoScroll();
         setTimeout(startExtraction, 1000);
     }
