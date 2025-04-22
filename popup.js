@@ -313,33 +313,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // Add this debugging function to check if the progress bar elements exist
-  function checkProgressBarElements() {
-    console.log("Progress bar elements check:");
-    console.log("downloadedBarElement exists:", !!downloadedBarElement);
-    console.log("waitingBarElement exists:", !!waitingBarElement);
-    
-    if (downloadedBarElement) {
-      console.log("downloadedBarElement current width:", downloadedBarElement.style.width);
-    }
-    
-    if (waitingBarElement) {
-      console.log("waitingBarElement current width:", waitingBarElement.style.width);
-    }
-  }
-  
-  // Call this check after DOM is loaded
-  setTimeout(checkProgressBarElements, 500);
-  
-  // Also initialize the progress bars to ensure they're visible
-  if (downloadedBarElement) {
-    downloadedBarElement.style.width = '0%';
-  }
-  
-  if (waitingBarElement) {
-    waitingBarElement.style.width = '0%';
-  }
-
   function initializePagesGrid(totalPages) {
     pagesGrid.className = 'pages-grid';
     pagesGrid.innerHTML = '';

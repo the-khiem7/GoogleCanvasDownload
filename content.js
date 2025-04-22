@@ -13,12 +13,19 @@ function sanitizeFileName(name) {
 
 function sendStatusMessage(action, data) {
     try {
+        if (!chrome.runtime?.id) {
+            console.log('Extension context invalid, stopping process');
+            isDownloading = false;
+            return;
+        }
+        
         chrome.runtime.sendMessage({
             action: action,
             ...data
         });
     } catch (e) {
         console.error(`Failed to send ${action} message:`, e);
+        isDownloading = false;
     }
 }
 
@@ -101,6 +108,12 @@ function startDownloadProcess() {
 }
 
 function extractCanvasData() {
+    if (!chrome.runtime?.id) {
+        console.log('Extension context invalid, stopping process');
+        isDownloading = false;
+        return true;
+    }
+    
     const canvases = document.querySelectorAll('canvas.kix-canvas-tile-content');
     if (canvases.length === 0) {
         sendStatusMessage("downloadStatus", {
