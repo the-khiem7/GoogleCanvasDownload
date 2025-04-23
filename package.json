@@ -1,0 +1,35 @@
+{
+  "name": "ytdlp-downloader.bat",
+  "version": "1.0.0",
+  "description": "A Windows batch script that allows downloading private/restricted YouTube videos using yt-dlp with cookies authentication.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "commit": "cz",
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/the-khiem7/ytdlp-downloader.bat.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/the-khiem7/ytdlp-downloader.bat/issues"
+  },
+  "homepage": "https://github.com/the-khiem7/ytdlp-downloader.bat#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^9.1.7"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  }
+}
